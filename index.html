@@ -1,0 +1,79 @@
+<head>
+  <!-- CSP信任当前源和cdn域名 -->
+  <!-- 使用CSP防止XSS -->
+  <!-- 打包工具生成一个随机hash -->
+  <meta
+    http-equiv="Content-Security-Policy"
+    content="default-src 'self';script-src http://127.0.0.1:8080 'unsafe-inline'"
+  />
+  <meta id="versionStore" content="0.0.1" />
+</head>
+
+<body>
+  <div id="container"></div>
+
+  <!-- <img src="" onerror="localStorage.setItem('test/server/path/','alert(document.cookie)');" alt="" /> -->
+  <script src="http://127.0.0.1:8080/test.js"></script>
+
+  <script>
+    const container = document.getElementById("container");
+    if (container) {
+      container.style.display = "block";
+    }
+
+    let scriptPath = "test/server/path/";
+    let script = document.createElement("script");
+    // script.setAttribute("nonce", "20230412");
+    let newVersion = document.getElementById("versionStore").getAttribute("content");
+    let oldVersion = localStorage.getItem("version");
+
+    function _updateLocalStorage(path, value) {
+      localStorage.setItem("version", newVersion);
+      localStorage.setItem(path, value);
+    }
+
+    // 比较版本号大小
+    // 1.0.1 > 0.0.2
+    // 返回值如果a>b 返回true
+    function isBiggerVersion(a = "", b = "") {
+      const aArr = a.split(".");
+      const bArr = b.split(".");
+      // 只比较索引相同的元素
+      const aLen = aArr.length;
+      for (let i = 0; i < aLen; i++) {
+        if (aArr[i] === bArr[i]) {
+          continue;
+        }
+
+        if (aArr[i] > bArr[i]) {
+          return true;
+        } else if (aArr[i] < bArr[i]) {
+          return false;
+        }
+      }
+
+      // 来到这里说aArr比较完了还没有结果，说明a b 版本相等
+      return false;
+    }
+
+    // 如果版本更新并且没有缓存，那么需要请求js
+    if (isBiggerVersion(newVersion, oldVersion || "0.0.0")) {
+      const ajax = new XMLHttpRequest();
+      ajax.open("GET", `${scriptPath}main.${newVersion}.js`);
+      ajax.setRequestHeader("content-type", "text");
+
+      ajax.onreadystatechange = function () {
+        if (this.status === 200 && this.readyState === 4) {
+          script.innerHTML = this.response;
+          document.head.appendChild(script);
+          _updateLocalStorage(scriptPath, this.response);
+        }
+      };
+
+      ajax.send();
+    } else {
+      script.innerHTML = localStorage.getItem(scriptPath);
+      document.head.appendChild(script);
+    }
+  </script>
+</body>
